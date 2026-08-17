@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>歌单管理后台</title>
+<meta name="robots" content="noindex, nofollow" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="wrap" style="max-width: 640px;">
+
+  <div class="top-nav"><a href="index.html">← 返回歌单主页</a></div>
+
+  <header class="hero" style="padding: 40px 0 24px;">
+    <span class="hero__eyebrow">Backstage / 管理后台</span>
+    <h1 class="hero__title" style="font-size: clamp(28px,5vw,40px);">管理你的<em>歌单</em></h1>
+    <p class="hero__subtitle">这个页面直接读写你 GitHub 仓库里的 songs.json 文件。这个链接不要分享给别人，也不要把 Token 交给任何人。</p>
+  </header>
+
+  <!-- 连接设置 -->
+  <section class="admin-card" id="connectCard">
+    <h2>① 连接你的仓库</h2>
+    <div class="field-row">
+      <div class="field">
+        <label>GitHub 用户名 / 组织</label>
+        <input id="cfgOwner" type="text" placeholder="例如 yourname" />
+      </div>
+      <div class="field">
+        <label>仓库名</label>
+        <input id="cfgRepo" type="text" placeholder="例如 my-music-site" />
+      </div>
+    </div>
+    <div class="field-row">
+      <div class="field">
+        <label>分支</label>
+        <input id="cfgBranch" type="text" value="main" />
+      </div>
+      <div class="field">
+        <label>数据文件路径</label>
+        <input id="cfgPath" type="text" value="data/songs.json" />
+      </div>
+    </div>
+    <div class="field">
+      <label>Personal Access Token（仅在本次会话中使用）</label>
+      <input id="cfgToken" type="password" placeholder="github_pat_xxx 或 ghp_xxx" autocomplete="off" />
+    </div>
+    <div class="checkbox-row">
+      <input type="checkbox" id="cfgRemember" />
+      <label for="cfgRemember" style="margin:0;">在此设备的浏览器中记住这些信息（不建议在公用电脑上勾选）</label>
+    </div>
+    <button class="btn" id="btnConnect">连接仓库</button>
+    <div id="connectStatus"></div>
+  </section>
+
+  <!-- 歌曲管理，连接成功后显示 -->
+  <section class="hidden" id="manageSection">
+
+    <section class="admin-card">
+      <h2 id="formTitle">② 添加歌曲</h2>
+      <div class="field-row">
+        <div class="field">
+          <label>歌名 *</label>
+          <input id="fTitle" type="text" />
+        </div>
+        <div class="field">
+          <label>歌手</label>
+          <input id="fArtist" type="text" />
+        </div>
+      </div>
+      <div class="field-row">
+        <div class="field">
+          <label>封面图片链接（选填）</label>
+          <input id="fCover" type="text" placeholder="https://..." />
+        </div>
+        <div class="field">
+          <label>播放/跳转链接（选填）</label>
+          <input id="fUrl" type="text" placeholder="https://..." />
+        </div>
+      </div>
+      <div class="field">
+        <label>标签（选填，如 深夜循环 / 开车必放）</label>
+        <input id="fTag" type="text" />
+      </div>
+      <div class="field">
+        <label>备注（选填）</label>
+        <textarea id="fNote"></textarea>
+      </div>
+      <button class="btn" id="btnSave">保存歌曲</button>
+      <button class="btn btn--ghost hidden" id="btnCancelEdit">取消编辑</button>
+      <div id="formStatus"></div>
+    </section>
+
+    <section class="admin-card">
+      <h2>③ 当前歌单（<span id="songCount">0</span> 首）</h2>
+      <div id="songList"></div>
+    </section>
+
+  </section>
+
+</div>
+
+<script>
+/* ============ 基础状态 ============ */
+let state = {
+  owner: "", repo: "", branch: "main", path: "data/songs.json",
+  token: "", sha: null, songs: [], editingId: null
+};
+
+const $ = (id) => document.getElementById(id);
+
+/* ============ UTF-8 安全的 base64 编解码 ============ */
+function b64EncodeUnicode(str) {
+  return btoa(encodeURIComponent(str).replace(/%([0-9A-F]{2})/g,
+    (_, p1) => String.fromCharCode('0x' + p1)));
+}
+function b64DecodeUnicode(str) {
+  return decodeURIComponent(atob(str.replace(/\n/g, '')).split('').map(c =>
+    '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+
+/* ============ 状态提示 ============ */
+function showStatus(el, type, msg) {
+  el.innerHTML = `<div class="status status--${type}">${msg}</div>`;
+}
+function clearStatus(el) { el.innerHTML = ""; }
+
+/* ============ 恢复本地保存的配置 ============ */
+(function restoreConfig() {
+  const saved = localStorage.getItem("musicAdminConfig") || sessionStorage.getItem("musicAdminConfig");
+  if (saved) {
+    try {
+      const cfg = JSON.parse(saved);
+      $("cfgOwner").value = cfg.owner || "";
+      $("cfgRepo").value = cfg.repo || "";
+      $("cfgBranch").value = cfg.branch || "main";
+      $("cfgPath").value = cfg.path || "data/songs.json";
+    } catch (e) {}
+  }
+})();
+
+/* ============ GitHub API 封装 ============ */
+const API_BASE = "https://api.github.com";
+
+async function ghGetFile() {
+  const url = `${API_BASE}/repos/${state.owner}/${state.repo}/contents/${state.path}?ref=${state.branch}`;
+  const res = await fetch(url, {
+    headers: {
+      Authorization: `Bearer ${state.token}`,
+      Accept: "application/vnd.github+json"
+    }
+  });
+  if (res.status === 404) {
+    return { notFound: true };
+  }
+  if (!res.ok) {
+    const body = await res.json().catch(() => ({}));
+    throw new Error(body.message || `GitHub 返回错误 (${res.status})`);
+  }
+  const data = await res.json();
+  const content = b64DecodeUnicode(data.content);
+  return { sha: data.sha, songs: JSON.parse(content || "[]") };
+}
+
+async function ghPutFile(songs, message) {
+  const url = `${API_BASE}/repos/${state.owner}/${state.repo}/contents/${state.path}`;
+  const body = {
+    message: message || "更新歌单",
+    content: b64EncodeUnicode(JSON.stringify(songs, null, 2)),
+    branch: state.branch
+  };
+  if (state.sha) body.sha = state.sha;
+
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${state.token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify(body)
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.message || `保存失败 (${res.status})`);
+  }
+  const data = await res.json();
+  state.sha = data.content.sha;
+}
+
+/* ============ 连接仓库 ============ */
+$("btnConnect").addEventListener("click", async () => {
+  const owner = $("cfgOwner").value.trim();
+  const repo = $("cfgRepo").value.trim();
+  const branch = $("cfgBranch").value.trim() || "main";
+  const path = $("cfgPath").value.trim() || "data/songs.json";
+  const token = $("cfgToken").value.trim();
+  const remember = $("cfgRemember").checked;
+  const statusEl = $("connectStatus");
+
+  if (!owner || !repo || !token) {
+    showStatus(statusEl, "err", "请填写用户名、仓库名和 Token。");
+    return;
+  }
+
+  state = { ...state, owner, repo, branch, path, token };
+  showStatus(statusEl, "pending", "正在连接 GitHub…");
+
+  try {
+    const result = await ghGetFile();
+    if (result.notFound) {
+      state.sha = null;
+      state.songs = [];
+      showStatus(statusEl, "ok", "已连接。仓库里还没有数据文件，保存第一首歌时会自动创建。");
+    } else {
+      state.sha = result.sha;
+      state.songs = result.songs;
+      showStatus(statusEl, "ok", `已连接，读取到 ${state.songs.length} 首歌曲。`);
+    }
+
+    if (remember) {
+      localStorage.setItem("musicAdminConfig", JSON.stringify({ owner, repo, branch, path }));
+    } else {
+      sessionStorage.setItem("musicAdminConfig", JSON.stringify({ owner, repo, branch, path }));
+    }
+
+    $("manageSection").classList.remove("hidden");
+    renderSongList();
+  } catch (err) {
+    showStatus(statusEl, "err", "连接失败：" + err.message + "（请检查 Token 权限、用户名/仓库名是否正确）");
+  }
+});
+
+/* ============ 渲染歌曲列表 ============ */
+function renderSongList() {
+  const listEl = $("songList");
+  $("songCount").textContent = state.songs.length;
+  listEl.innerHTML = "";
+
+  if (!state.songs.length) {
+    listEl.innerHTML = `<p style="color:var(--text-muted);font-size:14px;">还没有歌曲，在上面的表单里添加第一首吧。</p>`;
+    return;
+  }
+
+  state.songs.forEach((song) => {
+    const row = document.createElement("div");
+    row.className = "admin-song";
+    row.innerHTML = `
+      <div>
+        <div class="admin-song__title">${escapeHtml(song.title || "未命名")}</div>
+        <div class="admin-song__meta">${escapeHtml(song.artist || "")}${song.tag ? " · " + escapeHtml(song.tag) : ""}</div>
+      </div>
+      <div class="admin-song__actions">
+        <button class="btn btn--ghost btn--sm" data-action="edit" data-id="${song.id}">编辑</button>
+        <button class="btn btn--danger btn--sm" data-action="delete" data-id="${song.id}">删除</button>
+      </div>
+    `;
+    listEl.appendChild(row);
+  });
+}
+
+function escapeHtml(str) {
+  return String(str).replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;"
+  }[c]));
+}
+
+/* ============ 添加 / 编辑歌曲 ============ */
+$("songList").addEventListener("click", (e) => {
+  const btn = e.target.closest("button");
+  if (!btn) return;
+  const id = btn.dataset.id;
+  if (btn.dataset.action === "edit") startEdit(id);
+  if (btn.dataset.action === "delete") deleteSong(id);
+});
+
+function startEdit(id) {
+  const song = state.songs.find(s => s.id === id);
+  if (!song) return;
+  state.editingId = id;
+  $("fTitle").value = song.title || "";
+  $("fArtist").value = song.artist || "";
+  $("fCover").value = song.cover || "";
+  $("fUrl").value = song.url || "";
+  $("fTag").value = song.tag || "";
+  $("fNote").value = song.note || "";
+  $("formTitle").textContent = "② 编辑歌曲";
+  $("btnCancelEdit").classList.remove("hidden");
+  window.scrollTo({ top: $("formTitle").getBoundingClientRect().top + window.scrollY - 20, behavior: "smooth" });
+}
+
+$("btnCancelEdit").addEventListener("click", resetForm);
+
+function resetForm() {
+  state.editingId = null;
+  ["fTitle","fArtist","fCover","fUrl","fTag","fNote"].forEach(id => $(id).value = "");
+  $("formTitle").textContent = "② 添加歌曲";
+  $("btnCancelEdit").classList.add("hidden");
+  clearStatus($("formStatus"));
+}
+
+$("btnSave").addEventListener("click", async () => {
+  const title = $("fTitle").value.trim();
+  const statusEl = $("formStatus");
+  if (!title) { showStatus(statusEl, "err", "歌名不能为空。"); return; }
+
+  const songData = {
+    title,
+    artist: $("fArtist").value.trim(),
+    cover: $("fCover").value.trim(),
+    url: $("fUrl").value.trim(),
+    tag: $("fTag").value.trim(),
+    note: $("fNote").value.trim(),
+    addedAt: new Date().toISOString().slice(0, 10)
+  };
+
+  let updatedSongs;
+  let commitMsg;
+  if (state.editingId) {
+    updatedSongs = state.songs.map(s => s.id === state.editingId ? { ...s, ...songData } : s);
+    commitMsg = `更新歌曲：${title}`;
+  } else {
+    songData.id = String(Date.now());
+    updatedSongs = [...state.songs, songData];
+    commitMsg = `添加歌曲：${title}`;
+  }
+
+  showStatus(statusEl, "pending", "正在保存到 GitHub…");
+  $("btnSave").disabled = true;
+  try {
+    await ghPutFile(updatedSongs, commitMsg);
+    state.songs = updatedSongs;
+    renderSongList();
+    resetForm();
+    showStatus(statusEl, "ok", "已保存 ✓");
+    setTimeout(() => clearStatus(statusEl), 2500);
+  } catch (err) {
+    showStatus(statusEl, "err", "保存失败：" + err.message);
+  } finally {
+    $("btnSave").disabled = false;
+  }
+});
+
+async function deleteSong(id) {
+  const song = state.songs.find(s => s.id === id);
+  if (!song) return;
+  if (!confirm(`确定要删除《${song.title}》吗？`)) return;
+
+  const updatedSongs = state.songs.filter(s => s.id !== id);
+  const statusEl = $("formStatus");
+  showStatus(statusEl, "pending", "正在删除…");
+  try {
+    await ghPutFile(updatedSongs, `删除歌曲：${song.title}`);
+    state.songs = updatedSongs;
+    renderSongList();
+    showStatus(statusEl, "ok", "已删除 ✓");
+    setTimeout(() => clearStatus(statusEl), 2500);
+  } catch (err) {
+    showStatus(statusEl, "err", "删除失败：" + err.message);
+  }
+}
+</script>
+
+</body>
+</html>

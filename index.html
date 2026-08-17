@@ -1,0 +1,132 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>我的歌单 · Playlist</title>
+<meta name="description" content="一份持续更新的私人歌单" />
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<div class="wrap">
+
+  <header class="hero">
+    <span class="hero__eyebrow">Side A / 私人歌单</span>
+    <h1 class="hero__title">最近在听<br/><em>反复循环</em>的一些歌</h1>
+    <p class="hero__subtitle">歌单会不定期更新，收录的都是真的会单曲循环的那种。点歌名旁边的圆点可以跳转到外部播放链接。</p>
+    <div class="hero__meta">
+      <span id="metaCount">— 首歌曲</span>
+      <span id="metaUpdated"></span>
+    </div>
+  </header>
+
+  <div class="searchbar">
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+    <input id="searchInput" type="text" placeholder="搜索歌名 / 歌手 / 标签…" />
+  </div>
+
+  <main class="tracklist" id="tracklist">
+    <!-- 曲目由 JS 动态渲染 -->
+  </main>
+
+  <p class="footer">保持更新中 · 由歌单主人手动管理</p>
+</div>
+
+<template id="trackTemplate">
+  <div class="track">
+    <div class="track__num"></div>
+    <div class="track__cover">
+      <svg class="cover-fallback" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+    </div>
+    <div class="track__info">
+      <div class="track__title"></div>
+      <div class="track__artist"></div>
+      <div class="track__note"></div>
+    </div>
+    <div class="track__right">
+      <span class="tag"></span>
+      <a class="playlink" target="_blank" rel="noopener" title="外部播放链接">
+        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg>
+      </a>
+    </div>
+  </div>
+</template>
+
+<script>
+const DATA_PATH = "data/songs.json";
+
+async function loadSongs() {
+  const listEl = document.getElementById("tracklist");
+  try {
+    const res = await fetch(DATA_PATH, { cache: "no-store" });
+    if (!res.ok) throw new Error("无法加载歌曲数据");
+    const songs = await res.json();
+    window.__ALL_SONGS__ = songs;
+    render(songs);
+  } catch (err) {
+    listEl.innerHTML = `<div class="empty"><strong>还没有歌曲</strong>去后台添加第一首吧。</div>`;
+  }
+}
+
+function render(songs) {
+  const listEl = document.getElementById("tracklist");
+  const tpl = document.getElementById("trackTemplate");
+  listEl.innerHTML = "";
+
+  document.getElementById("metaCount").textContent = `${songs.length} 首歌曲`;
+  if (songs.length) {
+    const latest = songs.map(s => s.addedAt).filter(Boolean).sort().pop();
+    document.getElementById("metaUpdated").textContent = latest ? `最近更新于 ${latest}` : "";
+  }
+
+  if (!songs.length) {
+    listEl.innerHTML = `<div class="empty"><strong>还没有歌曲</strong>去后台添加第一首吧。</div>`;
+    return;
+  }
+
+  songs.forEach((song, i) => {
+    const node = tpl.content.cloneNode(true);
+    node.querySelector(".track__num").textContent = String(i + 1).padStart(2, "0");
+    node.querySelector(".track__title").textContent = song.title || "未命名";
+    node.querySelector(".track__artist").textContent = song.artist || "";
+
+    const noteEl = node.querySelector(".track__note");
+    if (song.note) { noteEl.textContent = "“" + song.note + "”"; } else { noteEl.remove(); }
+
+    const tagEl = node.querySelector(".tag");
+    if (song.tag) { tagEl.textContent = song.tag; } else { tagEl.remove(); }
+
+    const coverEl = node.querySelector(".track__cover");
+    if (song.cover) {
+      coverEl.style.backgroundImage = `url("${song.cover}")`;
+      coverEl.querySelector(".cover-fallback")?.remove();
+    }
+
+    const linkEl = node.querySelector(".playlink");
+    if (song.url) { linkEl.href = song.url; } else { linkEl.remove(); }
+
+    listEl.appendChild(node);
+  });
+}
+
+document.getElementById("searchInput").addEventListener("input", (e) => {
+  const q = e.target.value.trim().toLowerCase();
+  const all = window.__ALL_SONGS__ || [];
+  if (!q) { render(all); return; }
+  const filtered = all.filter(s =>
+    (s.title || "").toLowerCase().includes(q) ||
+    (s.artist || "").toLowerCase().includes(q) ||
+    (s.tag || "").toLowerCase().includes(q)
+  );
+  render(filtered);
+});
+
+loadSongs();
+</script>
+
+</body>
+</html>
