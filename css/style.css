@@ -129,13 +129,16 @@ a:hover { text-decoration: underline; }
   border-top: 1px solid var(--line);
 }
 
+.track-wrapper {
+  border-bottom: 1px solid var(--line);
+}
+
 .track {
   display: grid;
   grid-template-columns: 44px 52px 1fr auto;
   align-items: center;
   gap: 16px;
   padding: 16px 4px;
-  border-bottom: 1px solid var(--line);
   position: relative;
   transition: background 0.2s ease;
 }
@@ -214,7 +217,7 @@ a:hover { text-decoration: underline; }
   white-space: nowrap;
 }
 
-.playlink {
+.playlink, .playbtn {
   width: 32px;
   height: 32px;
   border-radius: 50%;
@@ -224,8 +227,43 @@ a:hover { text-decoration: underline; }
   justify-content: center;
   color: var(--gold-soft);
   flex: none;
+  cursor: pointer;
+  background: transparent;
+  padding: 0;
+  transition: border-color 0.15s ease, background 0.15s ease, color 0.15s ease;
 }
-.playlink:hover { border-color: var(--gold); text-decoration: none; }
+.playlink:hover, .playbtn:hover { border-color: var(--gold); text-decoration: none; }
+.playbtn.is-playing {
+  background: var(--gold);
+  color: var(--bg-deep);
+  border-color: var(--gold);
+}
+
+.track__player {
+  overflow: hidden;
+  max-height: 0;
+  transition: max-height 0.3s ease;
+  padding: 0 4px;
+  grid-column: 1 / -1;
+}
+.track__player.open {
+  max-height: 200px;
+  padding: 0 4px 16px 4px;
+  margin-left: 112px;
+}
+.track__player iframe {
+  width: 100%;
+  border: none;
+  border-radius: 8px;
+  display: block;
+}
+.track__player audio {
+  width: 100%;
+  display: block;
+  height: 40px;
+  border-radius: 8px;
+  filter: invert(0.86) hue-rotate(180deg);
+}
 
 .empty {
   padding: 60px 4px;

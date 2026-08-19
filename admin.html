@@ -78,10 +78,19 @@
           <input id="fCover" type="text" placeholder="https://..." />
         </div>
         <div class="field">
-          <label>播放/跳转链接（选填）</label>
+          <label>跳转链接（选填，点圆形箭头图标跳转）</label>
           <input id="fUrl" type="text" placeholder="https://..." />
         </div>
       </div>
+      <div class="field">
+        <label>在线播放嵌入链接（选填，填了就能在网页里直接播放）</label>
+        <input id="fEmbed" type="text" placeholder="例如 https://music.163.com/outchain/player?type=2&id=xxx&auto=0&height=66" />
+      </div>
+      <p style="font-size:12px;color:var(--text-muted);margin:-8px 0 14px;">
+        怎么拿到这个链接？网易云音乐：打开歌曲页 →「分享」→「生成外链播放器」，复制里面
+        <code>iframe</code> 的 src 地址；QQ音乐同理找「生成外链播放器」；YouTube：分享 → 嵌入代码，取 src；
+        Spotify：分享 → 嵌入，取 src。README 里有更详细的图文说明。
+      </p>
       <div class="field">
         <label>标签（选填，如 深夜循环 / 开车必放）</label>
         <input id="fTag" type="text" />
@@ -89,6 +98,11 @@
       <div class="field">
         <label>备注（选填）</label>
         <textarea id="fNote"></textarea>
+      </div>
+      <div class="field">
+        <label>上传本地音频文件（选填，mp3/m4a/wav 等，建议不超过 18MB）</label>
+        <input id="fAudioFile" type="file" accept="audio/*" />
+        <div id="fAudioCurrent" style="margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
       </div>
       <button class="btn" id="btnSave">保存歌曲</button>
       <button class="btn btn--ghost hidden" id="btnCancelEdit">取消编辑</button>
@@ -121,6 +135,47 @@ function b64EncodeUnicode(str) {
 function b64DecodeUnicode(str) {
   return decodeURIComponent(atob(str.replace(/\n/g, '')).split('').map(c =>
     '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2)).join(''));
+}
+
+/* ============ 音频上传相关 ============ */
+const AUDIO_MAX_SIZE = 18 * 1024 * 1024; // 18MB
+
+function readFileAsBase64(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = () => resolve(reader.result.split(",")[1]);
+    reader.onerror = reject;
+    reader.readAsDataURL(file);
+  });
+}
+
+function sanitizeFileName(name) {
+  const cleaned = name.replace(/[^a-zA-Z0-9.\-_]/g, "_");
+  return `${Date.now()}-${cleaned}`;
+}
+
+async function ghUploadAudio(file) {
+  const base64 = await readFileAsBase64(file);
+  const audioPath = `audio/${sanitizeFileName(file.name)}`;
+  const url = `${API_BASE}/repos/${state.owner}/${state.repo}/contents/${audioPath}`;
+  const res = await fetch(url, {
+    method: "PUT",
+    headers: {
+      Authorization: `Bearer ${state.token}`,
+      Accept: "application/vnd.github+json",
+      "Content-Type": "application/json"
+    },
+    body: JSON.stringify({
+      message: `上传音频：${file.name}`,
+      content: base64,
+      branch: state.branch
+    })
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.message || `音频上传失败 (${res.status})`);
+  }
+  return audioPath;
 }
 
 /* ============ 状态提示 ============ */
@@ -286,8 +341,13 @@ function startEdit(id) {
   $("fArtist").value = song.artist || "";
   $("fCover").value = song.cover || "";
   $("fUrl").value = song.url || "";
+  $("fEmbed").value = song.embed || "";
   $("fTag").value = song.tag || "";
   $("fNote").value = song.note || "";
+  $("fAudioFile").value = "";
+  $("fAudioCurrent").textContent = song.audioFile
+    ? `当前已有音频文件：${song.audioFile.split("/").pop()}（重新选择文件可替换）`
+    : "";
   $("formTitle").textContent = "② 编辑歌曲";
   $("btnCancelEdit").classList.remove("hidden");
   window.scrollTo({ top: $("formTitle").getBoundingClientRect().top + window.scrollY - 20, behavior: "smooth" });
@@ -297,7 +357,9 @@ $("btnCancelEdit").addEventListener("click", resetForm);
 
 function resetForm() {
   state.editingId = null;
-  ["fTitle","fArtist","fCover","fUrl","fTag","fNote"].forEach(id => $(id).value = "");
+  ["fTitle","fArtist","fCover","fUrl","fEmbed","fTag","fNote"].forEach(id => $(id).value = "");
+  $("fAudioFile").value = "";
+  $("fAudioCurrent").textContent = "";
   $("formTitle").textContent = "② 添加歌曲";
   $("btnCancelEdit").classList.add("hidden");
   clearStatus($("formStatus"));
@@ -308,30 +370,47 @@ $("btnSave").addEventListener("click", async () => {
   const statusEl = $("formStatus");
   if (!title) { showStatus(statusEl, "err", "歌名不能为空。"); return; }
 
+  const audioInput = $("fAudioFile");
+  const audioFileChosen = audioInput.files && audioInput.files[0];
+  if (audioFileChosen && audioFileChosen.size > AUDIO_MAX_SIZE) {
+    showStatus(statusEl, "err", `音频文件太大了（${(audioFileChosen.size / 1024 / 1024).toFixed(1)}MB），建议不超过 18MB，可以用在线播放嵌入链接代替。`);
+    return;
+  }
+
   const songData = {
     title,
     artist: $("fArtist").value.trim(),
     cover: $("fCover").value.trim(),
     url: $("fUrl").value.trim(),
+    embed: $("fEmbed").value.trim(),
     tag: $("fTag").value.trim(),
     note: $("fNote").value.trim(),
     addedAt: new Date().toISOString().slice(0, 10)
   };
 
-  let updatedSongs;
-  let commitMsg;
-  if (state.editingId) {
-    updatedSongs = state.songs.map(s => s.id === state.editingId ? { ...s, ...songData } : s);
-    commitMsg = `更新歌曲：${title}`;
-  } else {
-    songData.id = String(Date.now());
-    updatedSongs = [...state.songs, songData];
-    commitMsg = `添加歌曲：${title}`;
-  }
-
-  showStatus(statusEl, "pending", "正在保存到 GitHub…");
   $("btnSave").disabled = true;
   try {
+    if (audioFileChosen) {
+      showStatus(statusEl, "pending", "正在上传音频文件…（大文件可能要等一会）");
+      songData.audioFile = await ghUploadAudio(audioFileChosen);
+    } else if (state.editingId) {
+      // 编辑时若未重新选择文件，保留原有 audioFile
+      const existing = state.songs.find(s => s.id === state.editingId);
+      if (existing && existing.audioFile) songData.audioFile = existing.audioFile;
+    }
+
+    let updatedSongs;
+    let commitMsg;
+    if (state.editingId) {
+      updatedSongs = state.songs.map(s => s.id === state.editingId ? { ...s, ...songData } : s);
+      commitMsg = `更新歌曲：${title}`;
+    } else {
+      songData.id = String(Date.now());
+      updatedSongs = [...state.songs, songData];
+      commitMsg = `添加歌曲：${title}`;
+    }
+
+    showStatus(statusEl, "pending", "正在保存到 GitHub…");
     await ghPutFile(updatedSongs, commitMsg);
     state.songs = updatedSongs;
     renderSongList();

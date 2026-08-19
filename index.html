@@ -17,7 +17,7 @@
   <header class="hero">
     <span class="hero__eyebrow">Side A / 私人歌单</span>
     <h1 class="hero__title">最近在听<br/><em>反复循环</em>的一些歌</h1>
-    <p class="hero__subtitle">歌单会不定期更新，收录的都是真的会单曲循环的那种。点歌名旁边的圆点可以跳转到外部播放链接。</p>
+    <p class="hero__subtitle">歌单会不定期更新，收录的都是真的会单曲循环的那种。点▶可以直接在页面里听，点箭头图标会跳转到外部平台。</p>
     <div class="hero__meta">
       <span id="metaCount">— 首歌曲</span>
       <span id="metaUpdated"></span>
@@ -37,22 +37,28 @@
 </div>
 
 <template id="trackTemplate">
-  <div class="track">
-    <div class="track__num"></div>
-    <div class="track__cover">
-      <svg class="cover-fallback" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+  <div class="track-wrapper">
+    <div class="track">
+      <div class="track__num"></div>
+      <div class="track__cover">
+        <svg class="cover-fallback" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="2.5"/></svg>
+      </div>
+      <div class="track__info">
+        <div class="track__title"></div>
+        <div class="track__artist"></div>
+        <div class="track__note"></div>
+      </div>
+      <div class="track__right">
+        <span class="tag"></span>
+        <button class="playbtn hidden" type="button" title="在线播放">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg>
+        </button>
+        <a class="playlink hidden" target="_blank" rel="noopener" title="外部播放链接">
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M7 17L17 7M7 7h10v10"/></svg>
+        </a>
+      </div>
     </div>
-    <div class="track__info">
-      <div class="track__title"></div>
-      <div class="track__artist"></div>
-      <div class="track__note"></div>
-    </div>
-    <div class="track__right">
-      <span class="tag"></span>
-      <a class="playlink" target="_blank" rel="noopener" title="外部播放链接">
-        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M8 5v14l11-7z"/></svg>
-      </a>
-    </div>
+    <div class="track__player hidden"></div>
   </div>
 </template>
 
@@ -70,6 +76,15 @@ async function loadSongs() {
   } catch (err) {
     listEl.innerHTML = `<div class="empty"><strong>还没有歌曲</strong>去后台添加第一首吧。</div>`;
   }
+}
+
+function closeAllPlayers() {
+  document.querySelectorAll(".track__player.open").forEach(el => {
+    el.classList.remove("open");
+    el.classList.add("hidden");
+    el.innerHTML = "";
+  });
+  document.querySelectorAll(".playbtn.is-playing").forEach(b => b.classList.remove("is-playing"));
 }
 
 function render(songs) {
@@ -107,7 +122,42 @@ function render(songs) {
     }
 
     const linkEl = node.querySelector(".playlink");
-    if (song.url) { linkEl.href = song.url; } else { linkEl.remove(); }
+    if (song.url) {
+      linkEl.href = song.url;
+      linkEl.classList.remove("hidden");
+    } else {
+      linkEl.remove();
+    }
+
+    const playBtn = node.querySelector(".playbtn");
+    const playerEl = node.querySelector(".track__player");
+    if (song.audioFile) {
+      playBtn.classList.remove("hidden");
+      playBtn.addEventListener("click", () => {
+        const isOpen = playerEl.classList.contains("open");
+        closeAllPlayers();
+        if (!isOpen) {
+          playerEl.innerHTML = `<audio controls autoplay preload="none" src="${song.audioFile}"></audio>`;
+          playerEl.classList.remove("hidden");
+          playerEl.classList.add("open");
+          playBtn.classList.add("is-playing");
+        }
+      });
+    } else if (song.embed) {
+      playBtn.classList.remove("hidden");
+      playBtn.addEventListener("click", () => {
+        const isOpen = playerEl.classList.contains("open");
+        closeAllPlayers();
+        if (!isOpen) {
+          playerEl.innerHTML = `<iframe src="${song.embed}" height="80" allow="autoplay; encrypted-media" loading="lazy"></iframe>`;
+          playerEl.classList.remove("hidden");
+          playerEl.classList.add("open");
+          playBtn.classList.add("is-playing");
+        }
+      });
+    } else {
+      playBtn.remove();
+    }
 
     listEl.appendChild(node);
   });
