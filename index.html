@@ -131,7 +131,19 @@ function render(songs) {
 
     const playBtn = node.querySelector(".playbtn");
     const playerEl = node.querySelector(".track__player");
-    if (song.audioFile) {
+    if (song.videoFile) {
+      playBtn.classList.remove("hidden");
+      playBtn.addEventListener("click", () => {
+        const isOpen = playerEl.classList.contains("open");
+        closeAllPlayers();
+        if (!isOpen) {
+          playerEl.innerHTML = `<video controls autoplay preload="none" src="${song.videoFile}" style="width:100%;max-width:480px;border-radius:8px;display:block;"></video>`;
+          playerEl.classList.remove("hidden");
+          playerEl.classList.add("open");
+          playBtn.classList.add("is-playing");
+        }
+      });
+    } else if (song.audioFile) {
       playBtn.classList.remove("hidden");
       playBtn.addEventListener("click", () => {
         const isOpen = playerEl.classList.contains("open");
