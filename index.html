@@ -94,6 +94,9 @@ function closeAllPlayers() {
     el.classList.remove("open");
     el.classList.add("hidden");
     el.innerHTML = "";
+    el.style.maxHeight = "";
+    el.style.height = "";
+    el.style.overflow = "";
   });
   document.querySelectorAll(".playbtn.is-playing").forEach(b => b.classList.remove("is-playing"));
 }
@@ -151,6 +154,10 @@ function render(songs) {
           playerEl.innerHTML = `<video controls autoplay preload="none" src="${song.videoFile}" class="video-player"></video>`;
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
+          // 覆盖原本给音频条/嵌入框设计的高度限制，让视频容器能撑到实际需要的高度
+          playerEl.style.maxHeight = "none";
+          playerEl.style.height = "auto";
+          playerEl.style.overflow = "visible";
           playBtn.classList.add("is-playing");
         }
       });
