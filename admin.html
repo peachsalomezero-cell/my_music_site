@@ -49,6 +49,10 @@
       <label>Personal Access Token（仅在本次会话中使用）</label>
       <input id="cfgToken" type="password" placeholder="github_pat_xxx 或 ghp_xxx" autocomplete="off" />
     </div>
+    <div class="field">
+      <label>视频上传密码（仅在本次会话中使用，用于视频存储服务鉴权）</label>
+      <input id="cfgVideoPassword" type="password" placeholder="在 Cloudflare Worker 里设置的密码" autocomplete="off" />
+    </div>
     <div class="checkbox-row">
       <input type="checkbox" id="cfgRemember" />
       <label for="cfgRemember" style="margin:0;">在此设备的浏览器中记住这些信息（不建议在公用电脑上勾选）</label>
@@ -104,6 +108,11 @@
         <input id="fAudioFile" type="file" accept="audio/*" />
         <div id="fAudioCurrent" style="margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
       </div>
+      <div class="field">
+        <label>上传本地视频文件（选填，mp4 等，建议不超过 200MB）</label>
+        <input id="fVideoFile" type="file" accept="video/*" />
+        <div id="fVideoCurrent" style="margin-top:6px;font-size:12px;color:var(--text-muted);"></div>
+      </div>
       <button class="btn" id="btnSave">保存歌曲</button>
       <button class="btn btn--ghost hidden" id="btnCancelEdit">取消编辑</button>
       <div id="formStatus"></div>
@@ -122,7 +131,7 @@
 /* ============ 基础状态 ============ */
 let state = {
   owner: "", repo: "", branch: "main", path: "data/songs.json",
-  token: "", sha: null, songs: [], editingId: null
+  token: "", videoPassword: "", sha: null, songs: [], editingId: null
 };
 
 const $ = (id) => document.getElementById(id);
@@ -176,6 +185,29 @@ async function ghUploadAudio(file) {
     throw new Error(errBody.message || `音频上传失败 (${res.status})`);
   }
   return audioPath;
+}
+
+/* ============ 视频上传相关 ============ */
+const VIDEO_MAX_SIZE = 200 * 1024 * 1024; // 200MB，需和 Worker 里设置的一致
+const VIDEO_WORKER_URL = "https://video-upload-worker.peach-salomezero.workers.dev/";
+const VIDEO_PUBLIC_BASE = "https://pub-3cad2e4a7ba44829a5f78024e56c4040.r2.dev/";
+
+async function uploadVideoToR2(file, password) {
+  const res = await fetch(VIDEO_WORKER_URL, {
+    method: "POST",
+    headers: {
+      "X-Upload-Password": password,
+      "X-File-Name": file.name,
+      "Content-Type": file.type || "video/mp4"
+    },
+    body: file
+  });
+  if (!res.ok) {
+    const errBody = await res.json().catch(() => ({}));
+    throw new Error(errBody.error || `视频上传失败 (${res.status})`);
+  }
+  const data = await res.json();
+  return VIDEO_PUBLIC_BASE + data.fileName; // 直接存完整播放链接
 }
 
 /* ============ 状态提示 ============ */
@@ -254,6 +286,7 @@ $("btnConnect").addEventListener("click", async () => {
   const branch = $("cfgBranch").value.trim() || "main";
   const path = $("cfgPath").value.trim() || "data/songs.json";
   const token = $("cfgToken").value.trim();
+  const videoPassword = $("cfgVideoPassword").value;
   const remember = $("cfgRemember").checked;
   const statusEl = $("connectStatus");
 
@@ -262,7 +295,7 @@ $("btnConnect").addEventListener("click", async () => {
     return;
   }
 
-  state = { ...state, owner, repo, branch, path, token };
+  state = { ...state, owner, repo, branch, path, token, videoPassword };
   showStatus(statusEl, "pending", "正在连接 GitHub…");
 
   try {
@@ -348,6 +381,10 @@ function startEdit(id) {
   $("fAudioCurrent").textContent = song.audioFile
     ? `当前已有音频文件：${song.audioFile.split("/").pop()}（重新选择文件可替换）`
     : "";
+  $("fVideoFile").value = "";
+  $("fVideoCurrent").textContent = song.videoFile
+    ? `当前已有视频文件：${song.videoFile.split("/").pop()}（重新选择文件可替换）`
+    : "";
   $("formTitle").textContent = "② 编辑歌曲";
   $("btnCancelEdit").classList.remove("hidden");
   window.scrollTo({ top: $("formTitle").getBoundingClientRect().top + window.scrollY - 20, behavior: "smooth" });
@@ -360,6 +397,8 @@ function resetForm() {
   ["fTitle","fArtist","fCover","fUrl","fEmbed","fTag","fNote"].forEach(id => $(id).value = "");
   $("fAudioFile").value = "";
   $("fAudioCurrent").textContent = "";
+  $("fVideoFile").value = "";
+  $("fVideoCurrent").textContent = "";
   $("formTitle").textContent = "② 添加歌曲";
   $("btnCancelEdit").classList.add("hidden");
   clearStatus($("formStatus"));
@@ -374,6 +413,17 @@ $("btnSave").addEventListener("click", async () => {
   const audioFileChosen = audioInput.files && audioInput.files[0];
   if (audioFileChosen && audioFileChosen.size > AUDIO_MAX_SIZE) {
     showStatus(statusEl, "err", `音频文件太大了（${(audioFileChosen.size / 1024 / 1024).toFixed(1)}MB），建议不超过 18MB，可以用在线播放嵌入链接代替。`);
+    return;
+  }
+
+  const videoInput = $("fVideoFile");
+  const videoFileChosen = videoInput.files && videoInput.files[0];
+  if (videoFileChosen && videoFileChosen.size > VIDEO_MAX_SIZE) {
+    showStatus(statusEl, "err", `视频文件太大了（${(videoFileChosen.size / 1024 / 1024).toFixed(1)}MB），建议不超过 200MB。`);
+    return;
+  }
+  if (videoFileChosen && !state.videoPassword) {
+    showStatus(statusEl, "err", "要上传视频，需要先在①连接区域填写「视频上传密码」，然后重新点一次连接仓库。");
     return;
   }
 
@@ -397,6 +447,15 @@ $("btnSave").addEventListener("click", async () => {
       // 编辑时若未重新选择文件，保留原有 audioFile
       const existing = state.songs.find(s => s.id === state.editingId);
       if (existing && existing.audioFile) songData.audioFile = existing.audioFile;
+    }
+
+    if (videoFileChosen) {
+      showStatus(statusEl, "pending", "正在上传视频文件…（文件较大，可能要等一会）");
+      songData.videoFile = await uploadVideoToR2(videoFileChosen, state.videoPassword);
+    } else if (state.editingId) {
+      // 编辑时若未重新选择文件，保留原有 videoFile
+      const existing = state.songs.find(s => s.id === state.editingId);
+      if (existing && existing.videoFile) songData.videoFile = existing.videoFile;
     }
 
     let updatedSongs;
