@@ -9,17 +9,6 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Fraunces:ital,opsz,wght@0,9..144,500;0,9..144,600;1,9..144,500&family=Work+Sans:wght@400;500;600&family=JetBrains+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="css/style.css" />
-<style>
-  .track__player .video-player {
-    width: 100%;
-    max-width: 100%;
-    height: auto;
-    max-height: 70vh;
-    display: block;
-    border-radius: 8px;
-    background: #000;
-  }
-</style>
 </head>
 <body>
 
@@ -91,12 +80,9 @@ async function loadSongs() {
 
 function closeAllPlayers() {
   document.querySelectorAll(".track__player.open").forEach(el => {
-    el.classList.remove("open");
+    el.classList.remove("open", "track__player--video");
     el.classList.add("hidden");
     el.innerHTML = "";
-    el.style.maxHeight = "";
-    el.style.height = "";
-    el.style.overflow = "";
   });
   document.querySelectorAll(".playbtn.is-playing").forEach(b => b.classList.remove("is-playing"));
 }
@@ -151,13 +137,18 @@ function render(songs) {
         const isOpen = playerEl.classList.contains("open");
         closeAllPlayers();
         if (!isOpen) {
-          playerEl.innerHTML = `<video controls autoplay preload="none" src="${song.videoFile}" class="video-player"></video>`;
+          playerEl.innerHTML = `
+            <div class="video-frame">
+              <div class="video-frame__inner">
+                <video class="video-player" controls autoplay preload="none" src="${song.videoFile}"></video>
+              </div>
+            </div>
+            <div class="video-caption">
+              <span class="video-caption__dot"></span>
+              <span class="video-caption__label">Now Playing · Video</span>
+            </div>`;
           playerEl.classList.remove("hidden");
-          playerEl.classList.add("open");
-          // 覆盖原本给音频条/嵌入框设计的高度限制，让视频容器能撑到实际需要的高度
-          playerEl.style.maxHeight = "none";
-          playerEl.style.height = "auto";
-          playerEl.style.overflow = "visible";
+          playerEl.classList.add("open", "track__player--video");
           playBtn.classList.add("is-playing");
         }
       });
