@@ -46,7 +46,7 @@ a:hover { text-decoration: underline; }
 
 /* ---------- 布局容器 ---------- */
 .wrap {
-  max-width: 780px;
+  max-width: 840px;
   margin: 0 auto;
   padding: 0 24px 96px;
 }
@@ -251,6 +251,13 @@ a:hover { text-decoration: underline; }
   padding: 0 4px 16px 4px;
   margin-left: 112px;
 }
+.track__player.open.track__player--video {
+  max-height: none;
+  margin-left: 0;
+  margin-top: 14px;
+  margin-bottom: 22px;
+  padding: 0;
+}
 .track__player iframe {
   width: 100%;
   border: none;
@@ -263,6 +270,53 @@ a:hover { text-decoration: underline; }
   height: 40px;
   border-radius: 8px;
   filter: invert(0.86) hue-rotate(180deg);
+}
+
+/* ---------- 视频宽屏播放卡（YouTube 式片框） ---------- */
+.video-frame {
+  position: relative;
+  border-radius: 16px;
+  padding: 2px;
+  background: linear-gradient(120deg, var(--gold), var(--rose) 55%, var(--teal));
+}
+.video-frame__inner {
+  border-radius: 14px;
+  overflow: hidden;
+  background: #0b0709;
+  box-shadow: 0 28px 56px -20px rgba(0,0,0,0.7);
+}
+.video-player {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  object-fit: contain;
+  background: #0b0709;
+  display: block;
+}
+.video-caption {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 10px;
+  padding: 0 2px;
+}
+.video-caption__dot {
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--rose);
+  flex: none;
+  animation: pulse-dot 1.6s ease-in-out infinite;
+}
+@keyframes pulse-dot {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.35; }
+}
+.video-caption__label {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.18em;
+  text-transform: uppercase;
+  color: var(--text-muted);
 }
 
 .empty {
