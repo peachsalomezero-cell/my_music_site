@@ -50,6 +50,33 @@ a:hover { text-decoration: underline; }
   padding: 0 24px 96px;
 }
 
+/* ---------- 视图切换标签栏 ---------- */
+.view-tabs {
+  display: inline-flex;
+  gap: 4px;
+  margin-top: 24px;
+  padding: 4px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: 999px;
+}
+.view-tab {
+  font-family: var(--font-mono);
+  font-size: 12px;
+  letter-spacing: 0.04em;
+  color: var(--text-muted);
+  padding: 7px 18px;
+  border-radius: 999px;
+  transition: background 0.15s ease, color 0.15s ease;
+  cursor: pointer;
+}
+.view-tab:hover { color: var(--text); text-decoration: none; }
+.view-tab.is-active {
+  background: var(--accent);
+  color: var(--bg-deep);
+  font-weight: 600;
+}
+
 /* ---------- Hero ---------- */
 .hero {
   padding: 72px 0 36px;
