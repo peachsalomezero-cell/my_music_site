@@ -91,8 +91,8 @@ a:hover { text-decoration: underline; }
 
 .hero__decor {
   position: absolute;
-  top: 32px;
-  right: 200px;
+  top: 20px;
+  left: 230px;
   width: 240px;
   height: 240px;
   overflow: hidden;
@@ -105,7 +105,7 @@ a:hover { text-decoration: underline; }
   height: 100%;
 }
 @media (max-width: 640px) {
-  .hero__decor { width: 170px; height: 170px; top: 4px; right: 8px; }
+  .hero__decor { width: 170px; height: 170px; top: 8px; left: auto; right: 8px; }
 }
 
 .hero__eyebrow {
