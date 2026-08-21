@@ -91,10 +91,10 @@ a:hover { text-decoration: underline; }
 
 .hero__decor {
   position: absolute;
-  top: 20px;
-  left: 230px;
-  width: 240px;
-  height: 240px;
+  top: 10px;
+  left: 130px;
+  width: 260px;
+  height: 260px;
   overflow: hidden;
   pointer-events: none;
   z-index: 0;
