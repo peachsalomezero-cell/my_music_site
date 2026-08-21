@@ -104,6 +104,7 @@ function closeAllPlayers() {
     el.innerHTML = "";
   });
   document.querySelectorAll(".playbtn.is-playing").forEach(b => b.classList.remove("is-playing"));
+  document.body.classList.remove("site-playing");
 }
 
 function render(songs) {
@@ -169,6 +170,7 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open", "track__player--video");
           playBtn.classList.add("is-playing");
+          document.body.classList.add("site-playing");
         }
       });
     } else if (song.audioFile) {
@@ -181,6 +183,7 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
           playBtn.classList.add("is-playing");
+          document.body.classList.add("site-playing");
         }
       });
     } else if (song.embed) {
@@ -193,6 +196,7 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
           playBtn.classList.add("is-playing");
+          document.body.classList.add("site-playing");
         }
       });
     } else {
