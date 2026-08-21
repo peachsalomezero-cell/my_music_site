@@ -220,7 +220,8 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open", "track__player--video");
           playBtn.classList.add("is-playing");
-          startBeatReactive(playerEl.querySelector("video"));
+          // 视频文件存在 R2，跨域，接入音频分析会导致浏览器静音其输出，这里直接用固定节奏动画
+          document.body.classList.add("decor-active", "site-playing");
         }
       });
     } else if (song.audioFile) {
