@@ -210,7 +210,7 @@ function render(songs) {
           playerEl.innerHTML = `
             <div class="video-frame">
               <div class="video-frame__inner">
-                <video class="video-player" controls autoplay preload="none" crossorigin="anonymous" src="${song.videoFile}"></video>
+                <video class="video-player" controls autoplay preload="none" src="${song.videoFile}"></video>
               </div>
             </div>
             <div class="video-caption">
@@ -229,7 +229,7 @@ function render(songs) {
         const isOpen = playerEl.classList.contains("open");
         closeAllPlayers();
         if (!isOpen) {
-          playerEl.innerHTML = `<audio controls autoplay preload="none" crossorigin="anonymous" src="${song.audioFile}"></audio>`;
+          playerEl.innerHTML = `<audio controls autoplay preload="none" src="${song.audioFile}"></audio>`;
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
           playBtn.classList.add("is-playing");
