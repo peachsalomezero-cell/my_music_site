@@ -97,6 +97,56 @@ async function loadSongs() {
   }
 }
 
+/* ============ 圆环视觉效果：音频实时跳动 / 固定动画兜底 ============ */
+let __audioCtx = null;
+let __analyser = null;
+let __sourceNode = null;
+let __rafId = null;
+
+function stopDecorEffects() {
+  if (__rafId) cancelAnimationFrame(__rafId);
+  __rafId = null;
+  document.querySelectorAll(".hero__decor circle").forEach(c => { c.style.transform = ""; });
+  document.body.classList.remove("decor-active", "site-playing", "beat-reactive");
+}
+
+function startBeatReactive(mediaEl) {
+  try {
+    if (!__audioCtx) __audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    if (__audioCtx.state === "suspended") __audioCtx.resume();
+
+    if (__sourceNode) { try { __sourceNode.disconnect(); } catch (e) {} }
+    __sourceNode = __audioCtx.createMediaElementSource(mediaEl);
+    __analyser = __audioCtx.createAnalyser();
+    __analyser.fftSize = 256;
+    __sourceNode.connect(__analyser);
+    __analyser.connect(__audioCtx.destination);
+
+    document.body.classList.add("decor-active", "beat-reactive");
+
+    const dataArray = new Uint8Array(__analyser.frequencyBinCount);
+    const rings = document.querySelectorAll(".hero__decor circle");
+
+    function loop() {
+      __analyser.getByteFrequencyData(dataArray);
+      const bassRange = Math.min(12, dataArray.length);
+      let sum = 0;
+      for (let i = 0; i < bassRange; i++) sum += dataArray[i];
+      const level = (sum / bassRange) / 255;
+
+      rings.forEach((ring, i) => {
+        const scale = 1 + level * (0.5 + i * 0.18);
+        ring.style.transform = `scale(${scale.toFixed(3)})`;
+      });
+      __rafId = requestAnimationFrame(loop);
+    }
+    loop();
+  } catch (err) {
+    console.warn("音频可视化不可用，已回退到固定动画：", err.message);
+    document.body.classList.add("decor-active", "site-playing");
+  }
+}
+
 function closeAllPlayers() {
   document.querySelectorAll(".track__player.open").forEach(el => {
     el.classList.remove("open", "track__player--video");
@@ -104,7 +154,7 @@ function closeAllPlayers() {
     el.innerHTML = "";
   });
   document.querySelectorAll(".playbtn.is-playing").forEach(b => b.classList.remove("is-playing"));
-  document.body.classList.remove("site-playing");
+  stopDecorEffects();
 }
 
 function render(songs) {
@@ -160,7 +210,7 @@ function render(songs) {
           playerEl.innerHTML = `
             <div class="video-frame">
               <div class="video-frame__inner">
-                <video class="video-player" controls autoplay preload="none" src="${song.videoFile}"></video>
+                <video class="video-player" controls autoplay preload="none" crossorigin="anonymous" src="${song.videoFile}"></video>
               </div>
             </div>
             <div class="video-caption">
@@ -170,7 +220,7 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open", "track__player--video");
           playBtn.classList.add("is-playing");
-          document.body.classList.add("site-playing");
+          startBeatReactive(playerEl.querySelector("video"));
         }
       });
     } else if (song.audioFile) {
@@ -179,11 +229,11 @@ function render(songs) {
         const isOpen = playerEl.classList.contains("open");
         closeAllPlayers();
         if (!isOpen) {
-          playerEl.innerHTML = `<audio controls autoplay preload="none" src="${song.audioFile}"></audio>`;
+          playerEl.innerHTML = `<audio controls autoplay preload="none" crossorigin="anonymous" src="${song.audioFile}"></audio>`;
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
           playBtn.classList.add("is-playing");
-          document.body.classList.add("site-playing");
+          startBeatReactive(playerEl.querySelector("audio"));
         }
       });
     } else if (song.embed) {
@@ -196,7 +246,7 @@ function render(songs) {
           playerEl.classList.remove("hidden");
           playerEl.classList.add("open");
           playBtn.classList.add("is-playing");
-          document.body.classList.add("site-playing");
+          document.body.classList.add("decor-active", "site-playing");
         }
       });
     } else {

@@ -106,7 +106,7 @@ a:hover { text-decoration: underline; }
   transition: filter 0.3s ease;
   transform-origin: center;
 }
-.site-playing .hero__decor svg {
+.decor-active .hero__decor svg {
   animation: decor-hue 3s linear infinite;
 }
 @keyframes decor-hue {
@@ -117,11 +117,15 @@ a:hover { text-decoration: underline; }
 .hero__decor circle {
   transform-box: fill-box;
   transform-origin: center;
+  transition: transform 0.08s linear; /* 音频驱动时让缩放过渡更顺滑 */
 }
 .site-playing .hero__decor .ring-1 { animation: ring-spin-cw  2s linear infinite; animation-delay: 0s; }
 .site-playing .hero__decor .ring-2 { animation: ring-spin-ccw 2s linear infinite; animation-delay: 1s; }
 .site-playing .hero__decor .ring-3 { animation: ring-spin-cw  2s linear infinite; animation-delay: 2s; }
 .site-playing .hero__decor .ring-4 { animation: ring-spin-ccw 2s linear infinite; animation-delay: 3s; }
+
+/* 音频实时跳动模式下，交给 JS 逐帧控制缩放，停用固定节奏动画 */
+.beat-reactive .hero__decor circle { animation: none !important; }
 
 @keyframes ring-spin-cw {
   0%   { transform: rotate(0deg)   scale(1); }
