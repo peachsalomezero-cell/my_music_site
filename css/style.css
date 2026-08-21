@@ -107,12 +107,31 @@ a:hover { text-decoration: underline; }
   transform-origin: center;
 }
 .site-playing .hero__decor svg {
-  animation: decor-spin 3s ease-in-out infinite;
+  animation: decor-hue 3s linear infinite;
 }
-@keyframes decor-spin {
-  0%   { transform: rotate(0deg) scale(1);    filter: hue-rotate(0deg); }
-  50%  { transform: rotate(180deg) scale(1.55); filter: hue-rotate(180deg); }
-  100% { transform: rotate(360deg) scale(1);    filter: hue-rotate(360deg); }
+@keyframes decor-hue {
+  from { filter: hue-rotate(0deg); }
+  to   { filter: hue-rotate(360deg); }
+}
+
+.hero__decor circle {
+  transform-box: fill-box;
+  transform-origin: center;
+}
+.site-playing .hero__decor .ring-1 { animation: ring-spin-cw  2s linear infinite; animation-delay: 0s; }
+.site-playing .hero__decor .ring-2 { animation: ring-spin-ccw 2s linear infinite; animation-delay: 1s; }
+.site-playing .hero__decor .ring-3 { animation: ring-spin-cw  2s linear infinite; animation-delay: 2s; }
+.site-playing .hero__decor .ring-4 { animation: ring-spin-ccw 2s linear infinite; animation-delay: 3s; }
+
+@keyframes ring-spin-cw {
+  0%   { transform: rotate(0deg)   scale(1); }
+  50%  { transform: rotate(180deg) scale(1.55); }
+  100% { transform: rotate(360deg) scale(1); }
+}
+@keyframes ring-spin-ccw {
+  0%   { transform: rotate(0deg)    scale(1); }
+  50%  { transform: rotate(-180deg) scale(1.55); }
+  100% { transform: rotate(-360deg) scale(1); }
 }
 @media (max-width: 640px) {
   .hero__decor { width: 170px; height: 170px; top: 8px; left: auto; right: 8px; }
